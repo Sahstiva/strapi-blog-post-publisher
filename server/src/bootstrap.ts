@@ -1,7 +1,7 @@
 import type { Core } from '@strapi/strapi';
 
 const bootstrap = async ({ strapi }: { strapi: Core.Strapi }) => {
-  strapi.log.info('Bulk Publish plugin bootstrapped');
+  strapi.log.debug('Bulk Publish plugin bootstrapped');
 
   await strapi.service('admin::permission').actionProvider.registerMany([
     {
@@ -19,9 +19,10 @@ const bootstrap = async ({ strapi }: { strapi: Core.Strapi }) => {
   ]);
 
   const store = strapi.store({ type: 'plugin', name: 'bulk-publish' });
-  const webhookUrl = await store.get({ key: 'webhookUrl' });
-  if (webhookUrl === null || webhookUrl === undefined) {
-    await store.set({ key: 'webhookUrl', value: '' });
+  const existingUrl = await store.get({ key: 'webhookUrl' });
+  if (existingUrl === null || existingUrl === undefined) {
+    const configUrl = strapi.plugin('bulk-publish').config('webhookUrl') || '';
+    await store.set({ key: 'webhookUrl', value: configUrl });
   }
 };
 

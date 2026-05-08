@@ -1,4 +1,6 @@
 import type { Core } from '@strapi/strapi';
+import type { WebhookConfig } from '../types';
+import { DEFAULT_WEBHOOK_CONFIG } from '../types';
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
 const MAX_LOG_BODY_LENGTH = 500;
@@ -39,48 +41,104 @@ export function isAllowedWebhookUrl(urlStr: string): boolean {
   }
 }
 
+function buildGenericRequest(
+  config: WebhookConfig,
+  documentIds: string[]
+): { headers: Record<string, string>; body: string } {
+  const payload: Record<string, unknown> = {
+    event: 'bulk-publish',
+    posts: documentIds,
+    publishedAt: new Date().toISOString(),
+  };
+
+  for (const { key, value } of config.variables) {
+    if (key) payload[key] = value;
+  }
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (config.token) {
+    headers['Authorization'] = `Bearer ${config.token}`;
+  }
+
+  return { headers, body: JSON.stringify(payload) };
+}
+
+function buildGitlabRequest(
+  config: WebhookConfig,
+  documentIds: string[]
+): FormData {
+  const form = new FormData();
+  form.append('token', config.token);
+  form.append('ref', config.ref || 'main');
+
+  form.append('variables[BULK_PUBLISH_EVENT]', 'bulk-publish');
+  form.append('variables[BULK_PUBLISH_POSTS]', documentIds.join(','));
+  form.append('variables[BULK_PUBLISH_DATE]', new Date().toISOString());
+
+  for (const { key, value } of config.variables) {
+    if (key) form.append(`variables[${key}]`, value);
+  }
+
+  return form;
+}
+
+function logTruncated(strapi: Core.Strapi, status: number, text: string): void {
+  const truncated = text.length > MAX_LOG_BODY_LENGTH
+    ? text.slice(0, MAX_LOG_BODY_LENGTH) + '...'
+    : text;
+  strapi.log.warn(`bulk-publish webhook returned ${status}: ${truncated}`);
+}
+
 export default ({ strapi }: { strapi: Core.Strapi }) => {
   const getStore = () => strapi.store({ type: 'plugin', name: 'bulk-publish' });
 
   return {
-    async getWebhookUrl(): Promise<string> {
-      const url = await getStore().get({ key: 'webhookUrl' });
-      return (url as string) || '';
+    async getConfig(): Promise<WebhookConfig> {
+      const stored = await getStore().get({ key: 'webhookConfig' });
+      if (stored && typeof stored === 'object') {
+        return stored as WebhookConfig;
+      }
+      return { ...DEFAULT_WEBHOOK_CONFIG };
     },
 
-    async setWebhookUrl(url: string): Promise<void> {
-      await getStore().set({ key: 'webhookUrl', value: url });
+    async setConfig(config: WebhookConfig): Promise<void> {
+      await getStore().set({ key: 'webhookConfig', value: config });
     },
 
     async trigger(documentIds: string[]): Promise<{ triggered: boolean; error?: string }> {
-      const webhookUrl = await this.getWebhookUrl();
-      if (!webhookUrl) {
+      const config = await this.getConfig();
+      if (!config.url) {
         return { triggered: false, error: 'No webhook URL configured' };
       }
 
-      if (!isAllowedWebhookUrl(webhookUrl)) {
+      if (!isAllowedWebhookUrl(config.url)) {
         strapi.log.warn('bulk-publish: webhook URL blocked by SSRF protection');
         return { triggered: false, error: 'Webhook URL is not allowed' };
       }
 
       try {
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event: 'bulk-publish',
-            posts: documentIds,
-            publishedAt: new Date().toISOString(),
-          }),
-          signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
-        });
+        let response: Response;
+
+        if (config.preset === 'gitlab') {
+          const form = buildGitlabRequest(config, documentIds);
+          response = await fetch(config.url, {
+            method: 'POST',
+            body: form,
+            signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+          });
+        } else {
+          const { headers, body } = buildGenericRequest(config, documentIds);
+          response = await fetch(config.url, {
+            method: 'POST',
+            headers,
+            body,
+            signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+          });
+        }
 
         if (!response.ok) {
           const text = await response.text();
-          const truncated = text.length > MAX_LOG_BODY_LENGTH
-            ? text.slice(0, MAX_LOG_BODY_LENGTH) + '...'
-            : text;
-          strapi.log.warn(`bulk-publish webhook returned ${response.status}: ${truncated}`);
+          logTruncated(strapi, response.status, text);
           return { triggered: true, error: `Webhook returned ${response.status}` };
         }
 

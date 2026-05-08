@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import controllerFactory from '../bulk-publish';
+import type { WebhookConfig } from '../../types';
 
 function createMockCtx(body: Record<string, unknown> = {}) {
   return {
@@ -14,8 +15,8 @@ function createMockCtx(body: Record<string, unknown> = {}) {
 function createMockStrapi(overrides: {
   publishMany?: Function;
   getDraftPosts?: Function;
-  getWebhookUrl?: Function;
-  setWebhookUrl?: Function;
+  getConfig?: Function;
+  setConfig?: Function;
   trigger?: Function;
 } = {}) {
   return {
@@ -29,8 +30,10 @@ function createMockStrapi(overrides: {
         }
         if (name === 'webhook') {
           return {
-            getWebhookUrl: overrides.getWebhookUrl || vi.fn(() => ''),
-            setWebhookUrl: overrides.setWebhookUrl || vi.fn(),
+            getConfig: overrides.getConfig || vi.fn(() => ({
+              preset: 'generic', url: '', token: '', ref: 'main', variables: [],
+            })),
+            setConfig: overrides.setConfig || vi.fn(),
             trigger: overrides.trigger || vi.fn(() => ({ triggered: false })),
           };
         }
@@ -39,6 +42,14 @@ function createMockStrapi(overrides: {
     })),
   } as any;
 }
+
+const validConfig: WebhookConfig = {
+  preset: 'generic',
+  url: 'https://example.com/hook',
+  token: '',
+  ref: 'main',
+  variables: [],
+};
 
 describe('bulk-publish controller', () => {
   describe('getPosts', () => {
@@ -148,77 +159,149 @@ describe('bulk-publish controller', () => {
   });
 
   describe('getSettings', () => {
-    it('returns webhook URL', async () => {
+    it('returns full webhook config', async () => {
       const strapi = createMockStrapi({
-        getWebhookUrl: vi.fn(() => 'https://example.com/hook'),
+        getConfig: vi.fn(() => validConfig),
       });
       const controller = controllerFactory({ strapi });
       const ctx = createMockCtx();
 
       await controller.getSettings(ctx);
 
-      expect(ctx.body).toEqual({ data: { webhookUrl: 'https://example.com/hook' } });
+      expect(ctx.body).toEqual({ data: validConfig });
     });
   });
 
   describe('updateSettings', () => {
-    it('rejects non-string webhookUrl', async () => {
+    it('rejects invalid preset', async () => {
       const strapi = createMockStrapi();
       const controller = controllerFactory({ strapi });
-      const ctx = createMockCtx({ webhookUrl: 123 });
+      const ctx = createMockCtx({ ...validConfig, preset: 'invalid' });
 
       await controller.updateSettings(ctx);
 
-      expect(ctx.badRequest).toHaveBeenCalledWith('webhookUrl must be a string');
+      expect(ctx.badRequest).toHaveBeenCalledWith('preset must be one of: generic, gitlab');
+    });
+
+    it('rejects non-string url', async () => {
+      const strapi = createMockStrapi();
+      const controller = controllerFactory({ strapi });
+      const ctx = createMockCtx({ ...validConfig, url: 123 });
+
+      await controller.updateSettings(ctx);
+
+      expect(ctx.badRequest).toHaveBeenCalledWith('url must be a string');
     });
 
     it('rejects private URLs (SSRF)', async () => {
       const strapi = createMockStrapi();
       const controller = controllerFactory({ strapi });
-      const ctx = createMockCtx({ webhookUrl: 'http://169.254.169.254/latest/' });
+      const ctx = createMockCtx({ ...validConfig, url: 'http://169.254.169.254/latest/' });
 
       await controller.updateSettings(ctx);
 
-      expect(ctx.badRequest).toHaveBeenCalledWith(
-        'webhookUrl must be a valid public HTTP(S) URL'
-      );
+      expect(ctx.badRequest).toHaveBeenCalledWith('url must be a valid public HTTP(S) URL');
     });
 
     it('rejects localhost URLs', async () => {
       const strapi = createMockStrapi();
       const controller = controllerFactory({ strapi });
-      const ctx = createMockCtx({ webhookUrl: 'http://localhost:3000/' });
+      const ctx = createMockCtx({ ...validConfig, url: 'http://localhost:3000/' });
+
+      await controller.updateSettings(ctx);
+
+      expect(ctx.badRequest).toHaveBeenCalledWith('url must be a valid public HTTP(S) URL');
+    });
+
+    it('rejects non-string token', async () => {
+      const strapi = createMockStrapi();
+      const controller = controllerFactory({ strapi });
+      const ctx = createMockCtx({ ...validConfig, token: 123 });
+
+      await controller.updateSettings(ctx);
+
+      expect(ctx.badRequest).toHaveBeenCalledWith('token must be a string');
+    });
+
+    it('rejects empty ref for gitlab preset', async () => {
+      const strapi = createMockStrapi();
+      const controller = controllerFactory({ strapi });
+      const ctx = createMockCtx({ ...validConfig, preset: 'gitlab', ref: '' });
+
+      await controller.updateSettings(ctx);
+
+      expect(ctx.badRequest).toHaveBeenCalledWith('ref is required for GitLab preset');
+    });
+
+    it('rejects invalid variables format', async () => {
+      const strapi = createMockStrapi();
+      const controller = controllerFactory({ strapi });
+      const ctx = createMockCtx({ ...validConfig, variables: 'not-array' });
+
+      await controller.updateSettings(ctx);
+
+      expect(ctx.badRequest).toHaveBeenCalledWith('variables must be an array');
+    });
+
+    it('rejects variables with non-string keys', async () => {
+      const strapi = createMockStrapi();
+      const controller = controllerFactory({ strapi });
+      const ctx = createMockCtx({
+        ...validConfig,
+        variables: [{ key: 123, value: 'val' }],
+      });
 
       await controller.updateSettings(ctx);
 
       expect(ctx.badRequest).toHaveBeenCalledWith(
-        'webhookUrl must be a valid public HTTP(S) URL'
+        'Each variable must have string key and value'
       );
     });
 
-    it('accepts valid public URL', async () => {
+    it('accepts valid generic config', async () => {
       const setMock = vi.fn();
-      const strapi = createMockStrapi({ setWebhookUrl: setMock });
+      const strapi = createMockStrapi({ setConfig: setMock });
       const controller = controllerFactory({ strapi });
-      const ctx = createMockCtx({ webhookUrl: 'https://example.com/hook' });
+      const ctx = createMockCtx(validConfig);
 
       await controller.updateSettings(ctx);
 
       expect(ctx.badRequest).not.toHaveBeenCalled();
-      expect(setMock).toHaveBeenCalledWith('https://example.com/hook');
-      expect(ctx.body).toEqual({ data: { webhookUrl: 'https://example.com/hook' } });
+      expect(setMock).toHaveBeenCalledWith(validConfig);
+      expect(ctx.body).toEqual({ data: validConfig });
     });
 
-    it('accepts empty string to clear webhook', async () => {
+    it('accepts valid gitlab config with variables', async () => {
       const setMock = vi.fn();
-      const strapi = createMockStrapi({ setWebhookUrl: setMock });
+      const strapi = createMockStrapi({ setConfig: setMock });
       const controller = controllerFactory({ strapi });
-      const ctx = createMockCtx({ webhookUrl: '' });
+      const gitlabConfig: WebhookConfig = {
+        preset: 'gitlab',
+        url: 'https://gitlab.example.com/api/v4/projects/1/trigger/pipeline',
+        token: 'gl-token',
+        ref: 'main',
+        variables: [
+          { key: 'DEPLOY_WEBSITE', value: 'true' },
+          { key: 'ENV', value: 'production' },
+        ],
+      };
+      const ctx = createMockCtx(gitlabConfig);
 
       await controller.updateSettings(ctx);
 
       expect(ctx.badRequest).not.toHaveBeenCalled();
-      expect(setMock).toHaveBeenCalledWith('');
+      expect(setMock).toHaveBeenCalledWith(gitlabConfig);
+    });
+
+    it('accepts empty url to disable webhook', async () => {
+      const setMock = vi.fn();
+      const strapi = createMockStrapi({ setConfig: setMock });
+      const controller = controllerFactory({ strapi });
+      const ctx = createMockCtx({ ...validConfig, url: '' });
+
+      await controller.updateSettings(ctx);
+
+      expect(ctx.badRequest).not.toHaveBeenCalled();
     });
   });
 });

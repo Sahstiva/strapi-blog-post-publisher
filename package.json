@@ -1,6 +1,6 @@
 {
   "name": "strapi-bulk-publish",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Strapi 5 plugin to bulk publish content across all locales with a single webhook trigger",
   "license": "MIT",
   "author": "Alexander Vitshas <avitshas@gmail.com>",

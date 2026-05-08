@@ -11,7 +11,9 @@ Strapi 5 plugin to bulk publish content across all locales with a single webhook
 - Batch selection and one-click publish across all locales
 - Configurable content type and display field
 - Auto-detection of default locale from Strapi i18n settings
-- Single consolidated webhook call after publishing (no per-locale rebuilds)
+- Flexible webhook with preset formats: **Generic JSON** and **GitLab Pipeline Trigger**
+- Token-based authentication for webhooks
+- Configurable key-value variables sent with webhook requests
 - SSRF protection for webhook URLs
 - Confirmation dialog before bulk actions
 - Custom admin permissions
@@ -40,7 +42,6 @@ export default ({ env }) => ({
     config: {
       contentType: 'api::blog-post.blog-post', // required — your content type UID
       titleField: 'title',                      // optional, default: 'title'
-      webhookUrl: '',                            // optional, can also be set via Settings UI
     },
   },
 });
@@ -52,13 +53,14 @@ export default ({ env }) => ({
 |--------|------|----------|---------|-------------|
 | `contentType` | `string` | **yes** | — | Strapi content type UID (e.g. `api::article.article`) |
 | `titleField` | `string` | no | `'title'` | Field name used as the display title in the admin list |
-| `webhookUrl` | `string` | no | `''` | Initial webhook URL; can be changed later in Settings UI |
-
-The `webhookUrl` set in config serves as the initial seed value. Once changed through the admin Settings page, the UI value takes precedence.
 
 ## Webhook
 
-After publishing, a single POST request is sent to the configured webhook URL:
+Configure the webhook in **Settings > Bulk Publish > Webhook**. Two formats are supported:
+
+### Generic JSON
+
+Sends a `POST` request with `Content-Type: application/json`:
 
 ```json
 {
@@ -68,7 +70,32 @@ After publishing, a single POST request is sent to the configured webhook URL:
 }
 ```
 
-The webhook request has a 10-second timeout. Private/internal URLs (localhost, private IP ranges) are blocked for security.
+If a token is configured, it is sent as an `Authorization: Bearer <token>` header. Any custom variables are merged into the JSON body as top-level keys.
+
+### GitLab Pipeline Trigger
+
+Sends a `POST` request with `Content-Type: multipart/form-data`, matching the [GitLab pipeline trigger API](https://docs.gitlab.com/ee/ci/triggers/):
+
+```
+token=<trigger-token>
+ref=<branch>
+variables[BULK_PUBLISH_EVENT]=bulk-publish
+variables[BULK_PUBLISH_POSTS]=docId1,docId2
+variables[BULK_PUBLISH_DATE]=2026-05-08T12:00:00.000Z
+variables[YOUR_CUSTOM_VAR]=value
+```
+
+### Webhook Settings
+
+| Field | Description |
+|-------|-------------|
+| **Preset** | `Generic JSON` or `GitLab Pipeline Trigger` |
+| **URL** | Webhook endpoint URL |
+| **Token** | Auth token (Bearer header for generic, trigger token for GitLab) |
+| **Branch Ref** | Git branch for GitLab pipeline trigger (GitLab only) |
+| **Variables** | Key-value pairs sent as extra fields with every request |
+
+The webhook request has a 10-second timeout. Private/internal URLs (localhost, private IP ranges) are blocked for SSRF protection.
 
 ## Permissions
 
@@ -77,7 +104,7 @@ Configure in Settings > Roles:
 | Action | Purpose |
 |--------|---------|
 | `plugin::bulk-publish.publish` | Access bulk publish page and publish documents |
-| `plugin::bulk-publish.settings` | View and edit webhook URL |
+| `plugin::bulk-publish.settings` | View and edit webhook settings |
 
 ## Prerequisites
 

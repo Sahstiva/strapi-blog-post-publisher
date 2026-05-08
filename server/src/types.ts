@@ -19,10 +19,34 @@ export interface PublishResult {
   localeErrors: { locale: string; error: string }[];
 }
 
+export type WebhookPreset = 'generic' | 'gitlab';
+
+export const WEBHOOK_PRESETS: WebhookPreset[] = ['generic', 'gitlab'];
+
+export interface WebhookVariable {
+  key: string;
+  value: string;
+}
+
+export interface WebhookConfig {
+  preset: WebhookPreset;
+  url: string;
+  token: string;
+  ref: string;
+  variables: WebhookVariable[];
+}
+
+export const DEFAULT_WEBHOOK_CONFIG: WebhookConfig = {
+  preset: 'generic',
+  url: '',
+  token: '',
+  ref: 'main',
+  variables: [],
+};
+
 export interface PluginConfig {
   contentType: string;
   titleField: string;
-  webhookUrl: string;
 }
 
 export interface DraftDocument {

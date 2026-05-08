@@ -1,6 +1,7 @@
 import type { Core } from '@strapi/strapi';
 import type { Context } from 'koa';
-import type { PublishResult } from '../types';
+import type { PublishResult, WebhookConfig, WebhookVariable } from '../types';
+import { WEBHOOK_PRESETS } from '../types';
 import { isAllowedWebhookUrl } from '../services/webhook';
 
 const MAX_BATCH_SIZE = 100;
@@ -50,23 +51,62 @@ export default ({ strapi }: { strapi: Core.Strapi }) => {
     },
 
     async getSettings(ctx: Context) {
-      const webhookUrl = await webhookService().getWebhookUrl();
-      ctx.body = { data: { webhookUrl } };
+      const config = await webhookService().getConfig();
+      ctx.body = { data: config };
     },
 
     async updateSettings(ctx: Context) {
-      const { webhookUrl } = ctx.request.body as { webhookUrl?: unknown };
+      const body = ctx.request.body as Partial<WebhookConfig> | undefined;
 
-      if (typeof webhookUrl !== 'string') {
-        return ctx.badRequest('webhookUrl must be a string');
+      if (!body || typeof body !== 'object') {
+        return ctx.badRequest('Request body is required');
       }
 
-      if (webhookUrl && !isAllowedWebhookUrl(webhookUrl)) {
-        return ctx.badRequest('webhookUrl must be a valid public HTTP(S) URL');
+      const { preset, url, token, ref, variables } = body;
+
+      if (typeof preset !== 'string' || !WEBHOOK_PRESETS.includes(preset as never)) {
+        return ctx.badRequest(`preset must be one of: ${WEBHOOK_PRESETS.join(', ')}`);
       }
 
-      await webhookService().setWebhookUrl(webhookUrl);
-      ctx.body = { data: { webhookUrl } };
+      if (typeof url !== 'string') {
+        return ctx.badRequest('url must be a string');
+      }
+
+      if (url && !isAllowedWebhookUrl(url)) {
+        return ctx.badRequest('url must be a valid public HTTP(S) URL');
+      }
+
+      if (typeof token !== 'string') {
+        return ctx.badRequest('token must be a string');
+      }
+
+      if (typeof ref !== 'string') {
+        return ctx.badRequest('ref must be a string');
+      }
+
+      if (preset === 'gitlab' && !ref) {
+        return ctx.badRequest('ref is required for GitLab preset');
+      }
+
+      if (!Array.isArray(variables)) {
+        return ctx.badRequest('variables must be an array');
+      }
+
+      if (
+        !variables.every(
+          (v): v is WebhookVariable =>
+            typeof v === 'object' &&
+            v !== null &&
+            typeof v.key === 'string' &&
+            typeof v.value === 'string'
+        )
+      ) {
+        return ctx.badRequest('Each variable must have string key and value');
+      }
+
+      const config: WebhookConfig = { preset, url, token, ref, variables };
+      await webhookService().setConfig(config);
+      ctx.body = { data: config };
     },
   };
 };

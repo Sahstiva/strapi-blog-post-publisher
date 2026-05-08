@@ -1,10 +1,17 @@
 {
   "name": "strapi-bulk-publish",
   "version": "1.0.0",
-  "description": "Strapi plugin to bulk publish blog posts across all locales with a single webhook trigger",
+  "description": "Strapi 5 plugin to bulk publish content across all locales with a single webhook trigger",
   "license": "MIT",
-  "author": "",
-  "maintainers": [],
+  "author": "Alexander Vitshas <avitshas@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sahstiva/strapi-bulk-publish.git"
+  },
+  "homepage": "https://github.com/sahstiva/strapi-bulk-publish#readme",
+  "bugs": {
+    "url": "https://github.com/sahstiva/strapi-bulk-publish/issues"
+  },
   "exports": {
     "./strapi-admin": {
       "source": "./admin/src/index.ts",
@@ -23,24 +30,26 @@
   "keywords": [
     "strapi",
     "strapi-plugin",
+    "strapi5",
     "bulk-publish",
     "i18n",
-    "locales"
+    "locales",
+    "publish",
+    "webhook"
   ],
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "strapi-plugin build",
     "watch": "strapi-plugin watch",
     "watch:link": "strapi-plugin watch:link",
     "verify": "strapi-plugin verify",
+    "test": "vitest run",
     "test:ts:front": "run -T tsc -p admin/tsconfig.json",
     "test:ts:back": "run -T tsc -p server/tsconfig.json"
-  },
-  "dependencies": {
-    "@strapi/design-system": "^2.0.0-rc.14",
-    "@strapi/icons": "^2.0.0-rc.14"
   },
   "devDependencies": {
     "@strapi/sdk-plugin": "^5.0.0",
@@ -53,9 +62,12 @@
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.22.0",
     "styled-components": "^6.1.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
+    "@strapi/design-system": "^2.0.0-rc.14",
+    "@strapi/icons": "^2.0.0-rc.14",
     "@strapi/strapi": "^5.0.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
@@ -66,7 +78,7 @@
     "kind": "plugin",
     "name": "bulk-publish",
     "displayName": "Bulk Publish",
-    "description": "Bulk publish blog posts across all locales with a single webhook trigger"
+    "description": "Bulk publish content across all locales with a single webhook trigger"
   },
   "engines": {
     "node": ">=18.0.0 <=22.x.x",

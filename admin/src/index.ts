@@ -1,3 +1,4 @@
+import { Stack } from '@strapi/icons';
 import { PLUGIN_ID } from './pluginId';
 import pluginPermissions from './permissions';
 
@@ -5,7 +6,7 @@ export default {
   register(app: any) {
     app.addMenuLink({
       to: `plugins/${PLUGIN_ID}`,
-      icon: () => null,
+      icon: Stack,
       intlLabel: {
         id: `${PLUGIN_ID}.plugin.name`,
         defaultMessage: 'Bulk Publish',
@@ -15,6 +16,7 @@ export default {
         return HomePage;
       },
       permissions: pluginPermissions.publish,
+      position: 2,
     });
 
     app.createSettingSection(

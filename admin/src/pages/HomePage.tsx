@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Main,
   Box,
+  Badge,
   Typography,
   Button,
   Table,
@@ -151,6 +152,20 @@ const HomePage = () => {
               <Typography variant="epsilon" textColor="neutral600">
                 Publish blog posts across all locales with a single action
               </Typography>
+              <Flex gap={3} paddingTop={2}>
+                <Flex gap={1} alignItems="center">
+                  <Badge textColor="success700" backgroundColor="success100" size="S">en</Badge>
+                  <Typography variant="pi" textColor="neutral600">Draft</Typography>
+                </Flex>
+                <Flex gap={1} alignItems="center">
+                  <Badge textColor="primary700" backgroundColor="primary100" size="S">en ✓</Badge>
+                  <Typography variant="pi" textColor="neutral600">Published</Typography>
+                </Flex>
+                <Flex gap={1} alignItems="center">
+                  <Badge textColor="warning700" backgroundColor="warning100" size="S">en ✗</Badge>
+                  <Typography variant="pi" textColor="neutral600">Missing</Typography>
+                </Flex>
+              </Flex>
             </Box>
             <Button
               onClick={handlePublish}

@@ -1,21 +1,17 @@
 import { Badge, Flex } from '@strapi/design-system';
-
-interface LocaleInfo {
-  locale: string;
-  status: 'draft' | 'published' | 'missing';
-}
+import type { LocaleInfo, LocaleStatus } from '../types';
 
 interface LocaleBadgesProps {
   locales: LocaleInfo[];
 }
 
-const statusColors: Record<string, { textColor: string; backgroundColor: string }> = {
+const statusColors: Record<LocaleStatus, { textColor: string; backgroundColor: string }> = {
   draft: { textColor: 'success700', backgroundColor: 'success100' },
   published: { textColor: 'primary700', backgroundColor: 'primary100' },
   missing: { textColor: 'warning700', backgroundColor: 'warning100' },
 };
 
-const statusSuffix: Record<string, string> = {
+const statusSuffix: Record<LocaleStatus, string> = {
   draft: '',
   published: ' \u2713',
   missing: ' \u2717',
@@ -25,7 +21,7 @@ const LocaleBadges = ({ locales }: LocaleBadgesProps) => {
   return (
     <Flex gap={1} wrap="wrap">
       {locales.map(({ locale, status }) => {
-        const colors = statusColors[status] || statusColors.draft;
+        const colors = statusColors[status];
         return (
           <Badge
             key={locale}
@@ -34,7 +30,7 @@ const LocaleBadges = ({ locales }: LocaleBadgesProps) => {
             size="S"
           >
             {locale}
-            {statusSuffix[status] || ''}
+            {statusSuffix[status]}
           </Badge>
         );
       })}

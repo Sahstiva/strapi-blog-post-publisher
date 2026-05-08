@@ -3,7 +3,7 @@ import { PLUGIN_ID } from './pluginId';
 import pluginPermissions from './permissions';
 
 export default {
-  register(app: any) {
+  register(app: { addMenuLink: Function; createSettingSection: Function; registerPlugin: Function }) {
     app.addMenuLink({
       to: `plugins/${PLUGIN_ID}`,
       icon: Stack,
@@ -51,7 +51,7 @@ export default {
   },
 
   async registerTrads({ locales }: { locales: string[] }) {
-    const importedTranslations = await Promise.all(
+    return Promise.all(
       locales.map(async (locale) => {
         try {
           const data = await import(`./translations/${locale}.json`);
@@ -60,27 +60,19 @@ export default {
             locale,
           };
         } catch {
-          return {
-            data: {},
-            locale,
-          };
+          return { data: {}, locale };
         }
       })
     );
-
-    return importedTranslations;
   },
 };
 
-const prefixPluginTranslations = (
+function prefixPluginTranslations(
   trad: Record<string, string>,
   pluginId: string
-): Record<string, string> => {
-  return Object.keys(trad).reduce(
-    (acc, current) => {
-      acc[`${pluginId}.${current}`] = trad[current];
-      return acc;
-    },
-    {} as Record<string, string>
-  );
-};
+): Record<string, string> {
+  return Object.keys(trad).reduce<Record<string, string>>((acc, key) => {
+    acc[`${pluginId}.${key}`] = trad[key];
+    return acc;
+  }, {});
+}

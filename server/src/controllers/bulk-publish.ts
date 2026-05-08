@@ -1,64 +1,72 @@
 import type { Core } from '@strapi/strapi';
+import type { Context } from 'koa';
+import type { PublishResult } from '../types';
+import { isAllowedWebhookUrl } from '../services/webhook';
 
-export default ({ strapi }: { strapi: Core.Strapi }) => ({
-  async getPosts(ctx: any) {
-    const publishService = strapi.plugin('bulk-publish').service('publish');
-    const posts = await publishService.getDraftPosts();
-    ctx.body = { data: posts };
-  },
+const MAX_BATCH_SIZE = 100;
 
-  async publish(ctx: any) {
-    const { documentIds } = ctx.request.body;
+export default ({ strapi }: { strapi: Core.Strapi }) => {
+  const publishService = () => strapi.plugin('bulk-publish').service('publish');
+  const webhookService = () => strapi.plugin('bulk-publish').service('webhook');
 
-    if (!Array.isArray(documentIds) || documentIds.length === 0) {
-      return ctx.badRequest('documentIds must be a non-empty array');
-    }
+  return {
+    async getPosts(ctx: Context) {
+      const posts = await publishService().getDraftPosts();
+      ctx.body = { data: posts };
+    },
 
-    if (!documentIds.every((id: any) => typeof id === 'string' && id.length > 0)) {
-      return ctx.badRequest('Each documentId must be a non-empty string');
-    }
+    async publish(ctx: Context) {
+      const { documentIds } = ctx.request.body as { documentIds?: unknown };
 
-    const publishService = strapi.plugin('bulk-publish').service('publish');
-    const webhookService = strapi.plugin('bulk-publish').service('webhook');
+      if (!Array.isArray(documentIds) || documentIds.length === 0) {
+        return ctx.badRequest('documentIds must be a non-empty array');
+      }
 
-    const { published, errors } = await publishService.publishMany(documentIds);
+      if (documentIds.length > MAX_BATCH_SIZE) {
+        return ctx.badRequest(`Cannot publish more than ${MAX_BATCH_SIZE} documents at once`);
+      }
 
-    let webhookResult = { triggered: false, error: 'No posts published' };
-    if (published.length > 0) {
-      webhookResult = await webhookService.trigger(
-        published.map((p: any) => p.documentId)
-      );
-    }
+      if (!documentIds.every((id): id is string => typeof id === 'string' && id.length > 0)) {
+        return ctx.badRequest('Each documentId must be a non-empty string');
+      }
 
-    ctx.body = {
-      data: {
-        published,
-        errors,
-        webhookTriggered: webhookResult.triggered,
-        webhookError: webhookResult.error || null,
-      },
-    };
-  },
+      const { published, errors } = await publishService().publishMany(documentIds);
 
-  async getSettings(ctx: any) {
-    const webhookService = strapi.plugin('bulk-publish').service('webhook');
-    const webhookUrl = await webhookService.getWebhookUrl();
-    ctx.body = { data: { webhookUrl } };
-  },
+      let webhookResult = { triggered: false, error: 'No posts published' };
+      if (published.length > 0) {
+        webhookResult = await webhookService().trigger(
+          published.map((p: PublishResult) => p.documentId)
+        );
+      }
 
-  async updateSettings(ctx: any) {
-    const { webhookUrl } = ctx.request.body;
+      ctx.body = {
+        data: {
+          published,
+          errors,
+          webhookTriggered: webhookResult.triggered,
+          webhookError: webhookResult.error || null,
+        },
+      };
+    },
 
-    if (typeof webhookUrl !== 'string') {
-      return ctx.badRequest('webhookUrl must be a string');
-    }
+    async getSettings(ctx: Context) {
+      const webhookUrl = await webhookService().getWebhookUrl();
+      ctx.body = { data: { webhookUrl } };
+    },
 
-    if (webhookUrl && !/^https?:\/\/.+/.test(webhookUrl)) {
-      return ctx.badRequest('webhookUrl must be a valid HTTP(S) URL');
-    }
+    async updateSettings(ctx: Context) {
+      const { webhookUrl } = ctx.request.body as { webhookUrl?: unknown };
 
-    const webhookService = strapi.plugin('bulk-publish').service('webhook');
-    await webhookService.setWebhookUrl(webhookUrl);
-    ctx.body = { data: { webhookUrl } };
-  },
-});
+      if (typeof webhookUrl !== 'string') {
+        return ctx.badRequest('webhookUrl must be a string');
+      }
+
+      if (webhookUrl && !isAllowedWebhookUrl(webhookUrl)) {
+        return ctx.badRequest('webhookUrl must be a valid public HTTP(S) URL');
+      }
+
+      await webhookService().setWebhookUrl(webhookUrl);
+      ctx.body = { data: { webhookUrl } };
+    },
+  };
+};

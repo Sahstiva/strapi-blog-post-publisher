@@ -50,6 +50,11 @@ export default ({ strapi }: { strapi: Core.Strapi }) => {
       };
     },
 
+    async triggerWebhook(ctx: Context) {
+      const result = await webhookService().trigger(['manual-trigger']);
+      ctx.body = { data: result };
+    },
+
     async getSettings(ctx: Context) {
       const config = await webhookService().getConfig();
       ctx.body = { data: config };

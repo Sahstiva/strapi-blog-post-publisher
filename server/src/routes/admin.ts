@@ -32,6 +32,21 @@ export default {
       },
     },
     {
+      method: 'POST',
+      path: '/trigger',
+      handler: 'bulk-publish.triggerWebhook',
+      config: {
+        policies: [
+          'admin::isAuthenticatedAdmin',
+          {
+            name: 'admin::hasPermissions',
+            config: { actions: ['plugin::bulk-publish.settings'] },
+          },
+        ],
+        description: 'Manually trigger the webhook',
+      },
+    },
+    {
       method: 'GET',
       path: '/settings',
       handler: 'bulk-publish.getSettings',

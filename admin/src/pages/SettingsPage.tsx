@@ -14,7 +14,7 @@ import {
   Grid,
   IconButton,
 } from '@strapi/design-system';
-import { Trash, Plus } from '@strapi/icons';
+import { Trash, Plus, Play } from '@strapi/icons';
 import { Page, Layouts, useFetchClient, useNotification } from '@strapi/strapi/admin';
 import pluginPermissions from '../permissions';
 import { PLUGIN_ID } from '../pluginId';
@@ -44,12 +44,13 @@ const DEFAULT_CONFIG: WebhookConfig = {
 
 const SettingsPage = () => {
   const { formatMessage } = useIntl();
-  const { get, put } = useFetchClient();
+  const { get, put, post } = useFetchClient();
   const { toggleNotification } = useNotification();
   const [config, setConfig] = useState<WebhookConfig>(DEFAULT_CONFIG);
   const [initialConfig, setInitialConfig] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [triggering, setTriggering] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -93,6 +94,44 @@ const SettingsPage = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTrigger = async () => {
+    if (!config.url) {
+      toggleNotification({
+        type: 'warning',
+        message: formatMessage({ id: `${PLUGIN_ID}.notification.trigger.no-url` }),
+      });
+      return;
+    }
+    try {
+      setTriggering(true);
+      const { data } = await post(`/${PLUGIN_ID}/trigger`, {});
+      if (data.data?.triggered) {
+        toggleNotification({
+          type: 'success',
+          message: formatMessage({ id: `${PLUGIN_ID}.notification.trigger.success` }),
+        });
+      } else {
+        toggleNotification({
+          type: 'danger',
+          message: formatMessage(
+            { id: `${PLUGIN_ID}.notification.trigger.error` },
+            { error: data.data?.error || 'Unknown error' }
+          ),
+        });
+      }
+    } catch {
+      toggleNotification({
+        type: 'danger',
+        message: formatMessage(
+          { id: `${PLUGIN_ID}.notification.trigger.error` },
+          { error: 'Request failed' }
+        ),
+      });
+    } finally {
+      setTriggering(false);
     }
   };
 
@@ -145,9 +184,20 @@ const SettingsPage = () => {
           title={msg('settings.title')}
           subtitle={msg('settings.subtitle')}
           primaryAction={
-            <Button onClick={handleSave} disabled={!hasChanged || saving} loading={saving}>
-              {msg('button.save')}
-            </Button>
+            <Flex gap={2}>
+              <Button
+                variant="tertiary"
+                startIcon={<Play />}
+                onClick={handleTrigger}
+                disabled={!config.url || triggering || hasChanged}
+                loading={triggering}
+              >
+                {msg('button.trigger')}
+              </Button>
+              <Button onClick={handleSave} disabled={!hasChanged || saving} loading={saving}>
+                {msg('button.save')}
+              </Button>
+            </Flex>
           }
         />
 

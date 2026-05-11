@@ -15,7 +15,7 @@ import {
   IconButton,
 } from '@strapi/design-system';
 import { Trash, Plus } from '@strapi/icons';
-import { Page, useFetchClient, useNotification } from '@strapi/strapi/admin';
+import { Page, Layouts, useFetchClient, useNotification } from '@strapi/strapi/admin';
 import pluginPermissions from '../permissions';
 import { PLUGIN_ID } from '../pluginId';
 
@@ -126,34 +126,36 @@ const SettingsPage = () => {
 
   const msg = (id: string) => formatMessage({ id: `${PLUGIN_ID}.${id}` });
 
-  return (
-    <Page.Protect permissions={pluginPermissions.settings}>
-      <Main>
-        {loading ? (
+  if (loading) {
+    return (
+      <Page.Protect permissions={pluginPermissions.settings}>
+        <Main>
           <Flex justifyContent="center" paddingTop={8}>
             <Loader>{msg('loading.settings')}</Loader>
           </Flex>
-        ) : (
-          <>
-            <Box paddingTop={8} paddingBottom={4} paddingLeft={10} paddingRight={10}>
-              <Flex justifyContent="space-between" alignItems="center">
-                <Box>
-                  <Typography variant="alpha" tag="h1">
-                    {msg('settings.title')}
-                  </Typography>
-                  <Typography variant="epsilon" textColor="neutral600">
-                    {msg('settings.subtitle')}
-                  </Typography>
-                </Box>
-                <Button onClick={handleSave} disabled={!hasChanged || saving} loading={saving}>
-                  {msg('button.save')}
-                </Button>
-              </Flex>
-            </Box>
+        </Main>
+      </Page.Protect>
+    );
+  }
 
-            <Box paddingLeft={10} paddingRight={10} paddingBottom={10}>
-              <Box background="neutral0" padding={6} shadow="tableShadow" hasRadius>
-                <Flex direction="column" gap={4}>
+  return (
+    <Page.Protect permissions={pluginPermissions.settings}>
+      <Main>
+        <Layouts.Header
+          title={msg('settings.title')}
+          subtitle={msg('settings.subtitle')}
+          primaryAction={
+            <Button onClick={handleSave} disabled={!hasChanged || saving} loading={saving}>
+              {msg('button.save')}
+            </Button>
+          }
+        />
+
+        <Layouts.Content>
+          <Box background="neutral0" padding={6} shadow="tableShadow" hasRadius>
+            <Flex direction="column" alignItems="stretch" gap={6}>
+              <Grid.Root gap={5}>
+                <Grid.Item col={6} s={12} direction="column" alignItems="stretch">
                   <Field.Root name="preset">
                     <Field.Label>{msg('webhook.preset.label')}</Field.Label>
                     <SingleSelect
@@ -168,114 +170,150 @@ const SettingsPage = () => {
                       </SingleSelectOption>
                     </SingleSelect>
                   </Field.Root>
+                </Grid.Item>
 
-                  <TextInput
-                    label={msg('webhook.url.label')}
-                    placeholder={
-                      isGitlab
-                        ? msg('webhook.url.placeholder.gitlab')
-                        : msg('webhook.url.placeholder')
-                    }
-                    hint={msg('webhook.url.hint')}
-                    name="url"
-                    value={config.url}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      updateField('url', e.target.value)
-                    }
-                  />
+                {isGitlab && (
+                  <Grid.Item col={6} s={12} direction="column" alignItems="stretch">
+                    <Field.Root name="ref">
+                      <Field.Label>{msg('webhook.ref.label')}</Field.Label>
+                      <TextInput
+                        placeholder={msg('webhook.ref.placeholder')}
+                        name="ref"
+                        value={config.ref}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          updateField('ref', e.target.value)
+                        }
+                      />
+                      <Field.Hint>{msg('webhook.ref.hint')}</Field.Hint>
+                    </Field.Root>
+                  </Grid.Item>
+                )}
+              </Grid.Root>
 
-                  <TextInput
-                    label={msg('webhook.token.label')}
-                    placeholder={msg('webhook.token.placeholder')}
-                    hint={isGitlab ? msg('webhook.token.hint.gitlab') : msg('webhook.token.hint')}
-                    name="token"
-                    type="password"
-                    value={config.token}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      updateField('token', e.target.value)
-                    }
-                  />
-
-                  {isGitlab && (
+              <Grid.Root gap={5}>
+                <Grid.Item col={12} direction="column" alignItems="stretch">
+                  <Field.Root name="url">
+                    <Field.Label>{msg('webhook.url.label')}</Field.Label>
                     <TextInput
-                      label={msg('webhook.ref.label')}
-                      placeholder={msg('webhook.ref.placeholder')}
-                      hint={msg('webhook.ref.hint')}
-                      name="ref"
-                      value={config.ref}
+                      placeholder={
+                        isGitlab
+                          ? msg('webhook.url.placeholder.gitlab')
+                          : msg('webhook.url.placeholder')
+                      }
+                      name="url"
+                      value={config.url}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        updateField('ref', e.target.value)
+                        updateField('url', e.target.value)
                       }
                     />
-                  )}
+                    <Field.Hint>{msg('webhook.url.hint')}</Field.Hint>
+                  </Field.Root>
+                </Grid.Item>
+              </Grid.Root>
 
-                  <Box>
-                    <Flex justifyContent="space-between" alignItems="center" paddingBottom={2}>
-                      <Box>
-                        <Typography variant="pi" fontWeight="bold" textColor="neutral800">
-                          {msg('webhook.variables.label')}
-                        </Typography>
-                        <Typography variant="pi" textColor="neutral600" display="block">
-                          {isGitlab
-                            ? msg('webhook.variables.hint.gitlab')
-                            : msg('webhook.variables.hint')}
-                        </Typography>
-                      </Box>
-                      <Button
-                        variant="tertiary"
-                        startIcon={<Plus />}
-                        onClick={addVariable}
-                        size="S"
-                      >
-                        {msg('webhook.variables.add')}
-                      </Button>
-                    </Flex>
+              <Grid.Root gap={5}>
+                <Grid.Item col={12} direction="column" alignItems="stretch">
+                  <Field.Root name="token">
+                    <Field.Label>{msg('webhook.token.label')}</Field.Label>
+                    <TextInput
+                      placeholder={msg('webhook.token.placeholder')}
+                      name="token"
+                      type="password"
+                      value={config.token}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        updateField('token', e.target.value)
+                      }
+                    />
+                    <Field.Hint>
+                      {isGitlab ? msg('webhook.token.hint.gitlab') : msg('webhook.token.hint')}
+                    </Field.Hint>
+                  </Field.Root>
+                </Grid.Item>
+              </Grid.Root>
+            </Flex>
+          </Box>
 
-                    {config.variables.length > 0 && (
-                      <Flex direction="column" gap={2}>
-                        {config.variables.map((variable, index) => (
-                          <Grid.Root key={index} gap={2}>
-                            <Grid.Item col={5} s={12}>
-                              <TextInput
-                                aria-label={msg('webhook.variables.key')}
-                                placeholder={msg('webhook.variables.key')}
-                                name={`var-key-${index}`}
-                                value={variable.key}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  updateVariable(index, 'key', e.target.value)
-                                }
-                              />
-                            </Grid.Item>
-                            <Grid.Item col={6} s={12}>
-                              <TextInput
-                                aria-label={msg('webhook.variables.value')}
-                                placeholder={msg('webhook.variables.value')}
-                                name={`var-value-${index}`}
-                                value={variable.value}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  updateVariable(index, 'value', e.target.value)
-                                }
-                              />
-                            </Grid.Item>
-                            <Grid.Item col={1} s={12}>
-                              <IconButton
-                                onClick={() => removeVariable(index)}
-                                label="Delete"
-                                variant="ghost"
-                              >
-                                <Trash />
-                              </IconButton>
-                            </Grid.Item>
-                          </Grid.Root>
-                        ))}
-                      </Flex>
-                    )}
+          <Box paddingTop={6}>
+            <Box background="neutral0" shadow="tableShadow" hasRadius>
+              <Box padding={6} borderColor="neutral200" borderWidth="0 0 1px 0" borderStyle="solid">
+                <Typography variant="delta" tag="h2">
+                  {msg('webhook.variables.label')}
+                </Typography>
+              </Box>
+
+              <Box padding={6}>
+                {config.variables.length > 0 && (
+                  <Box paddingBottom={4}>
+                    <Grid.Root gap={4}>
+                      <Grid.Item col={5} s={12}>
+                        <Typography variant="sigma" textColor="neutral600">
+                          {msg('webhook.variables.key')}
+                        </Typography>
+                      </Grid.Item>
+                      <Grid.Item col={6} s={12}>
+                        <Typography variant="sigma" textColor="neutral600">
+                          {msg('webhook.variables.value')}
+                        </Typography>
+                      </Grid.Item>
+                      <Grid.Item col={1} />
+                    </Grid.Root>
                   </Box>
+                )}
+
+                <Flex direction="column" alignItems="stretch" gap={2}>
+                  {config.variables.map((variable, index) => (
+                    <Grid.Root key={index} gap={4}>
+                      <Grid.Item col={5} s={12} direction="column" alignItems="stretch">
+                        <TextInput
+                          aria-label={msg('webhook.variables.key')}
+                          placeholder={msg('webhook.variables.key')}
+                          name={`var-key-${index}`}
+                          value={variable.key}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            updateVariable(index, 'key', e.target.value)
+                          }
+                        />
+                      </Grid.Item>
+                      <Grid.Item col={6} s={12} direction="column" alignItems="stretch">
+                        <TextInput
+                          aria-label={msg('webhook.variables.value')}
+                          placeholder={msg('webhook.variables.value')}
+                          name={`var-value-${index}`}
+                          value={variable.value}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            updateVariable(index, 'value', e.target.value)
+                          }
+                        />
+                      </Grid.Item>
+                      <Grid.Item col={1} s={12}>
+                        <Flex justifyContent="center">
+                          <IconButton
+                            onClick={() => removeVariable(index)}
+                            label="Delete"
+                            variant="ghost"
+                          >
+                            <Trash />
+                          </IconButton>
+                        </Flex>
+                      </Grid.Item>
+                    </Grid.Root>
+                  ))}
                 </Flex>
+
+                <Box paddingTop={4}>
+                  <Button
+                    variant="tertiary"
+                    startIcon={<Plus />}
+                    onClick={addVariable}
+                    size="S"
+                  >
+                    {msg('webhook.variables.add')}
+                  </Button>
+                </Box>
               </Box>
             </Box>
-          </>
-        )}
+          </Box>
+        </Layouts.Content>
       </Main>
     </Page.Protect>
   );

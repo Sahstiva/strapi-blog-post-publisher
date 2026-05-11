@@ -49,7 +49,7 @@
   "webhook.ref.placeholder": "main",
   "webhook.ref.hint": "Git branch to trigger the pipeline on",
   "webhook.variables.label": "Variables",
-  "webhook.variables.add": "Add Variable",
+  "webhook.variables.add": "Create new variable",
   "webhook.variables.key": "Key",
   "webhook.variables.value": "Value",
   "webhook.variables.hint": "Extra fields sent with webhook requests",

@@ -108,7 +108,7 @@ const SettingsPage = () => {
     try {
       setTriggering(true);
       const { data } = await post(`/${PLUGIN_ID}/trigger`, {});
-      if (data.data?.triggered) {
+      if (data.data?.triggered && !data.data?.error) {
         toggleNotification({
           type: 'success',
           message: formatMessage({ id: `${PLUGIN_ID}.notification.trigger.success` }),

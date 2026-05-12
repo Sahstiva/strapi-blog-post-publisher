@@ -291,7 +291,9 @@ const HomePage = () => {
                     </Td>
                     <Td>
                       <Box>
-                        <Typography fontWeight="semiBold">{entry.title}</Typography>
+                        <Typography fontWeight="semiBold" display="block">
+                          {entry.title}
+                        </Typography>
                         <Typography variant="pi" textColor="neutral500">
                           {formatMessage(
                             { id: `${PLUGIN_ID}.table.updated` },

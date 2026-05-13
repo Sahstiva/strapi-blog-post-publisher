@@ -92,7 +92,7 @@ const HomePage = () => {
         { id: `${PLUGIN_ID}.notification.publish.success` },
         { count: publishedCount, locales: totalLocales }
       );
-      if (result.webhookTriggered) {
+      if (result.webhookTriggered && !result.webhookError) {
         message += ' ' + formatMessage({ id: `${PLUGIN_ID}.notification.publish.webhook` });
       } else if (result.webhookError) {
         message +=
